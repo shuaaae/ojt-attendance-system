@@ -126,6 +126,12 @@ export default function AttendancePage() {
     setHistoryDate(formatDateKey(current))
   }, [showCalendar])
 
+  useEffect(() => {
+    if (!geoError) return
+    const id = setTimeout(() => setGeoError(null), 3000)
+    return () => clearTimeout(id)
+  }, [geoError])
+
   const fetchRecords = useCallback(async () => {
     if (!userId) return
     const { data, error } = await supabase
@@ -439,6 +445,23 @@ export default function AttendancePage() {
 
   return (
     <div className={`relative space-y-6 p-6 pt-2 ${isLight ? 'bg-white text-slate-900' : 'text-white'}`}>
+      {geoError ? (
+        <div
+          className={`fixed inset-x-4 top-4 z-50 mx-auto max-w-md animate-[pageFadeUp_0.2s_ease-out] rounded-2xl border px-4 py-3 shadow-lg backdrop-blur-sm md:inset-x-auto md:right-6 ${
+            isLight
+              ? 'border-amber-200 bg-amber-50/95 text-amber-900'
+              : 'border-amber-500/30 bg-amber-500/15 text-amber-50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex-1 space-y-1 text-sm">
+              <p className="font-semibold">On-site check required</p>
+              <p className="leading-snug">{geoError}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="relative left-1/2 w-screen -translate-x-1/2 px-6 md:w-[90vw] md:-translate-x-1/2 md:px-10">
         <div className="flex items-start gap-6">
           <div>
