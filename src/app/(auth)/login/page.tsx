@@ -32,20 +32,32 @@ export default function LoginPage() {
         return
       }
 
-      // Get user role from user metadata
-      const { data: { user } } = await supabase.auth.getUser()
-      const userRole = user?.user_metadata?.role
+      const { data: userResp } = await supabase.auth.getUser()
+      const userId = userResp.user?.id
 
-      // Role-based redirect
-      let redirectUrl = '/ojt/dashboard' // default for OJT
-      
-      if (userRole === 'senior') {
-        redirectUrl = '/senior/dashboard'
-      } else if (userRole === 'admin') {
-        redirectUrl = '/admin/dashboard'
+      let role: string | null = null
+      if (userId) {
+        const { data: profile, error: profileErr } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle()
+
+        if (profileErr) {
+          console.error('[login] profile fetch error', profileErr)
+        } else {
+          role = profile?.role ?? null
+        }
       }
 
-      router.push(redirectUrl)
+      console.log('[login redirect] userId', userId, 'role', role)
+
+      let redirectUrl = '/ojt/dashboard'
+      if (role === 'head') redirectUrl = '/head/dashboard'
+      else if (role === 'senior') redirectUrl = '/senior/dashboard'
+      else if (role === 'admin') redirectUrl = '/admin/dashboard'
+
+      router.replace(redirectUrl)
       router.refresh()
     } finally {
       setIsLoading(false)

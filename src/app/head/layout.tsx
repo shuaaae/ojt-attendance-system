@@ -7,7 +7,7 @@ import DashboardShell from '@/components/DashboardShell'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { supabase } from '@/lib/supabase'
 
-export default function OjtLayout({ children }: { children: ReactNode }) {
+export default function HeadLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [allowed, setAllowed] = useState(false)
 
@@ -21,8 +21,8 @@ export default function OjtLayout({ children }: { children: ReactNode }) {
       const userId = sessionData.session.user.id
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
       const role = profile?.role ?? null
-      if (role !== 'ojt') {
-        const redirectUrl = role === 'head' ? '/head/dashboard' : role === 'senior' ? '/senior/dashboard' : role === 'admin' ? '/admin/dashboard' : '/login'
+      if (role !== 'head') {
+        const redirectUrl = role === 'ojt' ? '/ojt/dashboard' : role === 'senior' ? '/senior/dashboard' : role === 'admin' ? '/admin/dashboard' : '/login'
         router.replace(redirectUrl)
         return
       }
@@ -35,7 +35,7 @@ export default function OjtLayout({ children }: { children: ReactNode }) {
 
   return (
     <ThemeProvider>
-      <DashboardShell role="ojt">{children}</DashboardShell>
+      <DashboardShell role="head">{children}</DashboardShell>
     </ThemeProvider>
   )
 }

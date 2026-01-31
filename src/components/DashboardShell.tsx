@@ -10,7 +10,8 @@ import type { ReactNode } from 'react'
 
 import { supabase } from '@/lib/supabase'
 
-type NavItem = { label: string; href: string; icon: ReactNode }
+type Role = 'ojt' | 'head' | 'senior' | 'admin'
+type NavItem = { label: string; href: string; icon: ReactNode; roles: Role[] }
 
 const IconHome = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -35,22 +36,28 @@ const IconProfile = (
 )
 
 const defaultNavItems: NavItem[] = [
-  { label: 'Home', href: '/ojt/dashboard', icon: IconHome },
-  { label: 'Attendance', href: '/ojt/attendance', icon: IconAttendance },
-  { label: 'Profile', href: '/ojt/profile', icon: IconProfile },
+  { label: 'Home', href: '/ojt/dashboard', icon: IconHome, roles: ['ojt'] },
+  { label: 'Attendance', href: '/ojt/attendance', icon: IconAttendance, roles: ['ojt'] },
+  { label: 'Profile', href: '/ojt/profile', icon: IconProfile, roles: ['ojt'] },
+  { label: 'Head Dashboard', href: '/head/dashboard', icon: IconHome, roles: ['head'] },
+  { label: 'Senior Dashboard', href: '/senior/dashboard', icon: IconHome, roles: ['senior'] },
+  { label: 'Admin Dashboard', href: '/admin/dashboard', icon: IconHome, roles: ['admin'] },
 ]
 
 interface DashboardShellProps {
   children: ReactNode
   navItems?: NavItem[]
+  role?: Role
 }
 
-export default function DashboardShell({ children, navItems = defaultNavItems }: DashboardShellProps) {
+export default function DashboardShell({ children, navItems = defaultNavItems, role = 'ojt' }: DashboardShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { theme } = useTheme()
 
   const isLight = theme === 'light'
+
+  const filteredNavItems = navItems.filter((item) => item.roles.includes(role))
 
   const isActive = (href: string) => pathname === href
 
@@ -70,7 +77,7 @@ export default function DashboardShell({ children, navItems = defaultNavItems }:
         >
           <div className={`px-2 pb-4 text-lg font-semibold ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>Menu</div>
           <nav className={`space-y-2 text-sm font-medium ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
-            {navItems.map((item) => (
+            {filteredNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -134,7 +141,7 @@ export default function DashboardShell({ children, navItems = defaultNavItems }:
             isLight ? 'bg-white text-slate-900 ring-slate-200' : 'bg-white/5 text-white ring-white/10'
           }`}
         >
-          {navItems.map((item) => (
+          {filteredNavItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
