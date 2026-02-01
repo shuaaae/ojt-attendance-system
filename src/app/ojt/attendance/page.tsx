@@ -54,8 +54,10 @@ const formatNoteText = (note?: string) => {
     .join('\n')
 }
 
-const OFFICE_COORDS = { lat: 14.5989, lng: 121.0455 } // Unit 1405, Jafer Place, 19 Eisenhower St, San Juan City, Metro Manila
-const OFFICE_RADIUS_METERS = 200
+// Jafer Place, 19 Eisenhower St, San Juan City, Metro Manila
+const OFFICE_COORDS = { lat: 14.60018, lng: 121.04516 }
+// Increased radius to account for GPS drift on mobile devices
+const OFFICE_RADIUS_METERS = 350
 
 const distanceMeters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
   const R = 6371000
