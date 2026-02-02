@@ -151,7 +151,7 @@ export default function OjtDashboardPage() {
 
     const totalMinutes = data.reduce((sum, r) => {
       const ti = makeDateTime(r.date, r.time_in)
-      const to = makeDateTime(r.date, r.time_out)
+      const to = makeDateTime(r.date, r.time_out) ?? (ti ? new Date() : null)
       if (!ti || !to) return sum
       const minutes = Math.max(0, (to.getTime() - ti.getTime()) / 1000 / 60)
       return sum + minutes

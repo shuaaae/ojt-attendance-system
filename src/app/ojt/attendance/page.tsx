@@ -54,10 +54,10 @@ const formatNoteText = (note?: string) => {
     .join('\n')
 }
 
-// Jafer Place, 19 Eisenhower St, San Juan City, Metro Manila
-const OFFICE_COORDS = { lat: 14.60018, lng: 121.04516 }
-// Increased radius to account for GPS drift on mobile devices
-const OFFICE_RADIUS_METERS = 350
+// On-site coordinates (provided): J23X+XHW San Juan City, Metro Manila
+const OFFICE_COORDS = { lat: 14.605213, lng: 121.048929 }
+// Increased radius to account for GPS drift and device variance
+const OFFICE_RADIUS_METERS = 800
 
 const distanceMeters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
   const R = 6371000
@@ -94,6 +94,7 @@ export default function AttendancePage() {
   const [calendarEditDate, setCalendarEditDate] = useState<string | null>(null)
   const [calendarEditDraft, setCalendarEditDraft] = useState('')
   const [calendarIsSaving, setCalendarIsSaving] = useState(false)
+  const [showConfirmTimeout, setShowConfirmTimeout] = useState(false)
   const { theme } = useTheme()
   const isLight = theme === 'light'
 
@@ -186,13 +187,19 @@ export default function AttendancePage() {
   }, [userId])
 
   const handleTimeIn = async () => {
-    if (!userId || status === 'in' || status === 'done') return
+    const { data: sessionData } = await supabase.auth.getSession()
+    const currentUserId = sessionData.session?.user.id
+    if (!currentUserId) {
+      setGeoError('Login required to time in. Please sign in again.')
+      return
+    }
+    if (status === 'in' || status === 'done') return
     // Extra guard: prevent time-in if a completed record already exists today
     const todayKeyCheck = formatDateKey(new Date())
     const { data: existing } = await supabase
       .from('attendance_logs')
       .select('time_in,time_out')
-      .eq('user_id', userId)
+      .eq('user_id', currentUserId)
       .eq('date', todayKeyCheck)
       .maybeSingle()
     if (existing?.time_in && existing?.time_out) {
@@ -216,7 +223,7 @@ export default function AttendancePage() {
       const { latitude, longitude } = position.coords
       const distance = distanceMeters({ lat: latitude, lng: longitude }, OFFICE_COORDS)
       if (distance > OFFICE_RADIUS_METERS) {
-        setGeoError('You must be at the office location to time in.')
+        setGeoError(`You must be at the office location to time in. Detected distance: ${distance.toFixed(0)}m.`)
         setIsGeoChecking(false)
         return
       }
@@ -239,7 +246,7 @@ export default function AttendancePage() {
       .from('attendance_logs')
       .upsert(
         {
-          user_id: userId,
+          user_id: currentUserId,
           date: todayKeyLocal,
           time_in: toTimeString(now),
           updated_at: nowIso,
@@ -250,10 +257,27 @@ export default function AttendancePage() {
     setLastSavedAt(new Date().toISOString())
     await fetchRecords()
     setIsSaving(false)
+    setShowConfirmTimeout(false)
   }
 
   const handleTimeOut = async () => {
-    if (!userId || status !== 'in') return
+    const { data: sessionData } = await supabase.auth.getSession()
+    const currentUserId = sessionData.session?.user.id
+    if (!currentUserId) {
+      setGeoError('Login required to time out. Please sign in again.')
+      return
+    }
+    if (status !== 'in') return
+    setShowConfirmTimeout(true)
+  }
+
+  const confirmTimeOut = async () => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const currentUserId = sessionData.session?.user.id
+    if (!currentUserId || status !== 'in') {
+      setShowConfirmTimeout(false)
+      return
+    }
     setIsSaving(true)
     const now = new Date()
     setTimeOutAt(now)
@@ -264,7 +288,7 @@ export default function AttendancePage() {
       .from('attendance_logs')
       .upsert(
         {
-          user_id: userId,
+          user_id: currentUserId,
           date: todayKeyLocal,
           time_in: timeInAt ? toTimeString(timeInAt) : toTimeString(now),
           time_out: toTimeString(now),
@@ -364,7 +388,13 @@ export default function AttendancePage() {
       const d = new Date(r.date)
       return d >= new Date(formatDateKey(weekAgo)) && d <= new Date(formatDateKey(now))
     })
-    const totalMinutes = inRange.reduce((sum, r) => sum + (r.durationMinutes || 0), 0)
+    const totalMinutes = inRange.reduce((sum, r) => {
+      if (r.durationMinutes) return sum + r.durationMinutes
+      const ti = makeDateTime(r.date, r.timeIn ?? undefined)
+      const to = makeDateTime(r.date, r.timeOut ?? undefined) ?? (ti ? now : null)
+      if (!ti || !to) return sum
+      return sum + Math.max(0, (to.getTime() - ti.getTime()) / 1000 / 60)
+    }, 0)
     const daysAttended = inRange.filter((r) => r.timeIn).length
     const avgHours = daysAttended ? totalMinutes / 60 / daysAttended : 0
     return { totalMinutes, daysAttended, avgHours }
@@ -459,6 +489,33 @@ export default function AttendancePage() {
             <div className="flex-1 space-y-1 text-sm">
               <p className="font-semibold">On-site check required</p>
               <p className="leading-snug">{geoError}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showConfirmTimeout ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-md rounded-2xl border p-5 shadow-2xl ${isLight ? 'border-slate-200 bg-white text-slate-900' : 'border-white/10 bg-[#0b1220] text-white'}`}>
+            <div className="space-y-2">
+              <p className="text-lg font-semibold">Confirm time out</p>
+              <p className={`${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Are you sure you want to time out now? Your current session will be saved.</p>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowConfirmTimeout(false)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ring-1 transition ${isLight ? 'ring-slate-200 text-slate-700 hover:bg-slate-100' : 'ring-white/10 text-slate-200 hover:bg-white/10'}`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmTimeOut}
+                className={`rounded-full px-4 py-2 text-sm font-semibold text-white transition ${isLight ? 'bg-red-500 ring-1 ring-red-200 hover:bg-red-600' : 'bg-red-500 ring-1 ring-white/10 hover:bg-red-400'}`}
+              >
+                Yes, time out
+              </button>
             </div>
           </div>
         </div>
